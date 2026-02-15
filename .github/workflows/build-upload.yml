@@ -15,10 +15,12 @@ jobs:
           - config: static
             configure_args: --enable-static --disable-shared
             ldflags: -static -static-libgcc -static-libstdc++
+            cflags: -O2 -DFLAC__NO_DLL
             pkg_config_cmd: pkg-config --static
           - config: dynamic
             configure_args: --enable-shared --disable-static
             ldflags: ""
+            cflags: -O2
             pkg_config_cmd: pkg-config
 
     steps:
@@ -53,6 +55,7 @@ jobs:
         
         # Configure
         export PKG_CONFIG="${{ matrix.pkg_config_cmd }}"
+        export CFLAGS="${{ matrix.cflags }}"
         ../configure \
           --prefix=$(pwd)/install \
           ${{ matrix.configure_args }} \
