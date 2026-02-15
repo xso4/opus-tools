@@ -1,6 +1,7 @@
 name: Build and Upload
 
 on:
+  push:
   workflow_dispatch:
 
 jobs:
@@ -10,19 +11,17 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build_type: [static, dynamic]
         include:
           - build_type: static
             configure_args: --enable-static --disable-shared
-            cmake_args: -DBUILD_SHARED_LIBS=OFF
             # For static build, we want to link everything statically
-            cflags: "-O2 -static-libgcc -static-libstdc++"
+            # FLAC__NO_DLL is often needed when linking statically against FLAC on Windows
+            cflags: "-O2 -static-libgcc -static-libstdc++ -DFLAC__NO_DLL"
             ldflags: "-static"
             pkg_config: "pkg-config --static"
             artifact_name: opus-tools-windows-static
           - build_type: dynamic
             configure_args: --enable-shared --disable-static
-            cmake_args: -DBUILD_SHARED_LIBS=ON
             # For dynamic build, we usually don't force static gcc/stdc++ unless we want to avoid shipping those dlls
             # But to be safe and "dynamic", we can just use defaults or -O2.
             # However, linking against shared libraries of dependencies is the key.
@@ -49,111 +48,41 @@ jobs:
             mingw-w64-x86_64-cmake
             mingw-w64-x86_64-autotools
             mingw-w64-x86_64-gcc
-
-      - name: Build Dependencies
-        run: |
-          mkdir deps
-          cd deps
-          
-          # Clone dependencies
-          git clone https://github.com/xiph/ogg.git
-          git clone https://github.com/xiph/opus.git
-          git clone https://github.com/xiph/flac.git
-          git clone https://github.com/xiph/libopusenc.git
-          git clone https://github.com/xiph/opusfile.git
-
-          # Setup Environment
-          export PREFIX="$(pwd)/../install_dir"
-          mkdir -p $PREFIX
-          export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
-          export CPPFLAGS="-I$PREFIX/include"
-          # LDFLAGS will be set during configure/make, but we need to ensure it picks up the prefix
-          export LDFLAGS="-L$PREFIX/lib ${{ matrix.ldflags }}"
-          export CFLAGS="${{ matrix.cflags }}"
-          export CXXFLAGS="${{ matrix.cflags }}"
-          
-          # Build Ogg
-          echo "Building Ogg..."
-          cd ogg
-          ./autogen.sh
-          ./configure --prefix=$PREFIX ${{ matrix.configure_args }}
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build Opus
-          echo "Building Opus..."
-          cd opus
-          ./autogen.sh
-          ./configure --prefix=$PREFIX ${{ matrix.configure_args }}
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build FLAC
-          echo "Building FLAC..."
-          cd flac
-          # FLAC cmake options
-          cmake -S . -B build -G "MSYS Makefiles" \
-            -DCMAKE_INSTALL_PREFIX=$PREFIX \
-            ${{ matrix.cmake_args }} \
-            -DBUILD_PROGRAMS=OFF \
-            -DBUILD_TESTING=OFF \
-            -DINSTALL_MANPAGES=OFF \
-            -DWITH_OGG=ON \
-            -DOGG_ROOT=$PREFIX
-          cmake --build build -- -j$(nproc)
-          cmake --build build --target install
-          cd ..
-
-          # Build Libopusenc
-          echo "Building Libopusenc..."
-          cd libopusenc
-          ./autogen.sh
-          # libopusenc needs opus
-          ./configure --prefix=$PREFIX ${{ matrix.configure_args }}
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build Opusfile
-          echo "Building Opusfile..."
-          cd opusfile
-          ./autogen.sh
-          # opusfile needs opus and ogg
-          ./configure --prefix=$PREFIX ${{ matrix.configure_args }} --disable-http
-          make -j$(nproc)
-          make install
-          cd ..
+            mingw-w64-x86_64-libogg
+            mingw-w64-x86_64-opus
+            mingw-w64-x86_64-flac
+            mingw-w64-x86_64-libopusenc
+            mingw-w64-x86_64-opusfile
 
       - name: Build Opus-Tools
         run: |
-          export PREFIX="$(pwd)/install_dir"
-          export PKG_CONFIG_PATH="$PREFIX/lib/pkgconfig"
           export PKG_CONFIG="${{ matrix.pkg_config }}"
-          export CFLAGS="${{ matrix.cflags }} -I$PREFIX/include"
-          export LDFLAGS="-L$PREFIX/lib ${{ matrix.ldflags }}"
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
           
           echo "Building Opus-Tools..."
           ./autogen.sh
-          ./configure --prefix=$PREFIX ${{ matrix.configure_args }} --with-flac
+          # We don't need to specify PREFIX for dependencies because they are installed in system paths
+          # We set prefix for installation to a local directory to easily grab the binaries
+          ./configure --prefix=$(pwd)/install_dir ${{ matrix.configure_args }} --with-flac
           make -j$(nproc)
+          make install
           
           # Prepare Release
           mkdir release
-          cp *.exe release/
+          cp install_dir/bin/*.exe release/
           
           if [ "${{ matrix.build_type }}" == "dynamic" ]; then
             echo "Copying DLLs for dynamic build..."
             # Copy dependency DLLs
-            cp $PREFIX/bin/*.dll release/ || true
-            
-            # Copy MinGW runtime DLLs if needed (for fully standalone dynamic build)
-            # Find them using ldd or just copy common ones
-            # ldd opusenc.exe | grep mingw | awk '{print $3}' | xargs -I {} cp {} release/
+            # We use ldd to find direct dependencies in the mingw64 bin folder
             for exe in release/*.exe; do
+              # ldd output example: "libopus-0.dll => /mingw64/bin/libopus-0.dll (0x...)"
               ldd "$exe" | grep '/mingw64/bin' | awk '{print $3}' | while read dll; do
-                cp "$dll" release/
+                if [ -f "$dll" ]; then
+                   echo "Copying $dll..."
+                   cp "$dll" release/
+                fi
               done
             done
           fi
