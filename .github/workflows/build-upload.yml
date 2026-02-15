@@ -1,97 +1,86 @@
 name: Build and Upload
 
 on:
-  push:
   workflow_dispatch:
 
 jobs:
   build:
-    name: Build ${{ matrix.build_type }}
+    name: Build ${{ matrix.config }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
+        config: [static, dynamic]
         include:
-          - build_type: static
+          - config: static
             configure_args: --enable-static --disable-shared
-            # For static build, we want to link everything statically
-            # FLAC__NO_DLL is often needed when linking statically against FLAC on Windows
-            # -all-static is a libtool flag to force static linking of libtool libraries
-            cflags: "-O2 -static-libgcc -static-libstdc++ -DFLAC__NO_DLL"
-            ldflags: "-static -all-static"
-            pkg_config: "pkg-config --static"
-            artifact_name: opus-tools-windows-static
-          - build_type: dynamic
+            ldflags: -static -static-libgcc -static-libstdc++
+            make_ldflags: -all-static
+            cflags: -O2 -DFLAC__NO_DLL
+            pkg_config_cmd: pkg-config --static
+          - config: dynamic
             configure_args: --enable-shared --disable-static
-            # For dynamic build, we usually don't force static gcc/stdc++ unless we want to avoid shipping those dlls
-            # But to be safe and "dynamic", we can just use defaults or -O2.
-            # However, linking against shared libraries of dependencies is the key.
-            cflags: "-O2"
             ldflags: ""
-            pkg_config: "pkg-config"
-            artifact_name: opus-tools-windows-dynamic
-
-    defaults:
-      run:
-        shell: msys2 {0}
+            make_ldflags: ""
+            cflags: -O2
+            pkg_config_cmd: pkg-config
 
     steps:
-      - uses: actions/checkout@v4
-      
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            base-devel
-            git
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            mingw-w64-x86_64-autotools
-            mingw-w64-x86_64-gcc
-            mingw-w64-x86_64-libogg
-            mingw-w64-x86_64-opus
-            mingw-w64-x86_64-flac
-            mingw-w64-x86_64-libopusenc
-            mingw-w64-x86_64-opusfile
+    - uses: actions/checkout@v4
 
-      - name: Build Opus-Tools
-        run: |
-          export PKG_CONFIG="${{ matrix.pkg_config }}"
-          export CFLAGS="${{ matrix.cflags }}"
-          export LDFLAGS="${{ matrix.ldflags }}"
-          
-          echo "Building Opus-Tools..."
-          ./autogen.sh
-          # We don't need to specify PREFIX for dependencies because they are installed in system paths
-          # We set prefix for installation to a local directory to easily grab the binaries
-          ./configure --prefix=$(pwd)/install_dir ${{ matrix.configure_args }} --with-flac
-          make -j$(nproc)
-          make install
-          
-          # Prepare Release
-          mkdir release
-          cp install_dir/bin/*.exe release/
-          
-          if [ "${{ matrix.build_type }}" == "dynamic" ]; then
-            echo "Copying DLLs for dynamic build..."
-            # Copy dependency DLLs
-            # We use ldd to find direct dependencies in the mingw64 bin folder
-            for exe in release/*.exe; do
-              echo "Checking dependencies for $exe..."
-              # Use || true to prevent script failure if grep finds nothing
-              deps=$(ldd "$exe" | grep '/mingw64/bin' | awk '{print $3}' || true)
-              for dll in $deps; do
-                if [ -f "$dll" ]; then
-                   echo "Copying $dll..."
-                   cp "$dll" release/
-                fi
-              done
-            done
-          fi
-
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: release/
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          base-devel
+          autotools
+          git
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-libogg
+          mingw-w64-x86_64-opus
+          mingw-w64-x86_64-opusfile
+          mingw-w64-x86_64-libopusenc
+          mingw-w64-x86_64-flac
+    - name: Prepare Build
+      shell: msys2 {0}
+      run: |
+        ./autogen.sh
+    - name: Configure
+      shell: msys2 {0}
+      run: |
+        # Create a build directory
+        mkdir build-${{ matrix.config }}
+        cd build-${{ matrix.config }}
+        
+        # Configure
+        export PKG_CONFIG="${{ matrix.pkg_config_cmd }}"
+        export CFLAGS="${{ matrix.cflags }}"
+        ../configure \
+          --prefix=$(pwd)/install \
+          ${{ matrix.configure_args }} \
+          LDFLAGS="${{ matrix.ldflags }}"
+    - name: Build
+      shell: msys2 {0}
+      run: |
+        cd build-${{ matrix.config }}
+        make -j$(nproc) LDFLAGS="${{ matrix.ldflags }} ${{ matrix.make_ldflags }}"
+    - name: Install
+      shell: msys2 {0}
+      run: |
+        cd build-${{ matrix.config }}
+        make install
+    - name: Copy DLLs (Dynamic only)
+      if: matrix.config == 'dynamic'
+      shell: msys2 {0}
+      run: |
+        cd build-${{ matrix.config }}/install/bin
+        # Helper to copy DLLs
+        for exe in *.exe; do
+          ldd "$exe" | grep '/mingw64/bin' | awk '{print $3}' | xargs -I {} cp -u {} . || true
+        done
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: opus-tools-windows-${{ matrix.config }}
+        path: build-${{ matrix.config }}/install/
