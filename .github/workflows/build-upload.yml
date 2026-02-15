@@ -14,10 +14,12 @@ jobs:
         include:
           - config: static
             configure_args: --enable-static --disable-shared
-            ldflags: -static
+            ldflags: -static -static-libgcc -static-libstdc++
+            pkg_config_cmd: pkg-config --static
           - config: dynamic
             configure_args: --enable-shared --disable-static
             ldflags: ""
+            pkg_config_cmd: pkg-config
 
     steps:
     - uses: actions/checkout@v4
@@ -45,8 +47,12 @@ jobs:
     - name: Configure
       shell: msys2 {0}
       run: |
+        # Create a build directory
         mkdir build-${{ matrix.config }}
         cd build-${{ matrix.config }}
+        
+        # Configure
+        export PKG_CONFIG="${{ matrix.pkg_config_cmd }}"
         ../configure \
           --prefix=$(pwd)/install \
           ${{ matrix.configure_args }} \
