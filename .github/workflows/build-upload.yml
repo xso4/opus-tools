@@ -5,64 +5,67 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.linkage }}
+    name: Build ${{ matrix.config }}
     runs-on: windows-latest
     strategy:
-      fail-fast: false
       matrix:
-        linkage: [static, dynamic]
+        config: [static, dynamic]
         include:
-          - linkage: static
-            configure_args: "--enable-static --disable-shared"
-            ldflags: "-static"
-          - linkage: dynamic
-            configure_args: "--enable-shared --disable-static"
+          - config: static
+            configure_args: --enable-static --disable-shared
+            ldflags: -static
+            artifact_suffix: -static
+          - config: dynamic
+            configure_args: --enable-shared --disable-static
             ldflags: ""
-
+            artifact_suffix: -dynamic
+    
     defaults:
       run:
         shell: msys2 {0}
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          update: true
-          install: >-
-            base-devel
-            autotools
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-opus
-            mingw-w64-x86_64-libogg
-            mingw-w64-x86_64-flac
-            mingw-w64-x86_64-libopusenc
-            mingw-w64-x86_64-opusfile
-            mingw-w64-x86_64-libpcap
+    - uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          base-devel
+          git
+          mingw-w64-x86_64-toolchain
+          mingw-w64-x86_64-autotools
+          mingw-w64-x86_64-pkg-config
+          mingw-w64-x86_64-opus
+          mingw-w64-x86_64-libogg
+          mingw-w64-x86_64-flac
+          mingw-w64-x86_64-libopusenc
+          mingw-w64-x86_64-opusfile
 
-      - name: Build
-        run: |
-          ./autogen.sh
-          
-          # Set up PKG_CONFIG to use --static if needed
-          if [ "${{ matrix.linkage }}" == "static" ]; then
-            export PKG_CONFIG="pkg-config --static"
-          fi
-          
-          ./configure --host=x86_64-w64-mingw32 \
-            LDFLAGS="${{ matrix.ldflags }}" \
-            ${{ matrix.configure_args }}
-            
-          make -j$(nproc)
+    - name: Configure
+      run: |
+        ./autogen.sh
+        # For static build, we use pkg-config --static to ensure all dependencies are linked
+        if [ "${{ matrix.config }}" == "static" ]; then
+          export PKG_CONFIG="pkg-config --static"
+        fi
+        ./configure --host=x86_64-w64-mingw32 --prefix=$(pwd)/dist ${{ matrix.configure_args }} LDFLAGS="${{ matrix.ldflags }}"
 
-      - name: Prepare Artifacts
-        run: |
-          mkdir -p artifacts
-          cp *.exe artifacts/
+    - name: Build
+      run: make -j$(nproc)
 
-      - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: opus-tools-windows-${{ matrix.linkage }}
-          path: artifacts/*.exe
+    - name: Install
+      run: make install
+
+    - name: Prepare Artifacts
+      run: |
+        mkdir -p artifacts
+        cp dist/bin/*.exe artifacts/
+        cp COPYING artifacts/LICENSE.txt
+
+    - name: Upload Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: opus-tools-windows${{ matrix.artifact_suffix }}
+        path: artifacts/*
