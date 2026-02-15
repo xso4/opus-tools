@@ -13,7 +13,7 @@ jobs:
         include:
           - config: static
             configure_args: --enable-static --disable-shared
-            ldflags: -static
+            ldflags: -static -all-static
             artifact_suffix: -static
           - config: dynamic
             configure_args: --enable-shared --disable-static
@@ -63,6 +63,22 @@ jobs:
         mkdir -p artifacts
         cp dist/bin/*.exe artifacts/
         cp COPYING artifacts/LICENSE.txt
+        
+        # Check dependencies for debugging
+        echo "Dependency check for ${{ matrix.config }} build:"
+        ldd artifacts/opusenc.exe
+        
+        # For dynamic build, copy required DLLs
+        if [ "${{ matrix.config }}" == "dynamic" ]; then
+          echo "Copying DLLs for dynamic build..."
+          # Use ldd to find DLLs and copy them
+          # Note: ldd output format is "DLL => PATH (ADDRESS)"
+          # We filter for /mingw64/bin/ DLLs which are the ones we need to distribute
+          ldd artifacts/opusenc.exe | grep '/mingw64/bin/' | awk '{print $3}' | while read dll; do
+            cp "$dll" artifacts/
+            echo "Copied $dll"
+          done
+        fi
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
