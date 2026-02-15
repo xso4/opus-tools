@@ -16,8 +16,9 @@ jobs:
             configure_args: --enable-static --disable-shared
             # For static build, we want to link everything statically
             # FLAC__NO_DLL is often needed when linking statically against FLAC on Windows
+            # -all-static is a libtool flag to force static linking of libtool libraries
             cflags: "-O2 -static-libgcc -static-libstdc++ -DFLAC__NO_DLL"
-            ldflags: "-static"
+            ldflags: "-static -all-static"
             pkg_config: "pkg-config --static"
             artifact_name: opus-tools-windows-static
           - build_type: dynamic
@@ -77,8 +78,10 @@ jobs:
             # Copy dependency DLLs
             # We use ldd to find direct dependencies in the mingw64 bin folder
             for exe in release/*.exe; do
-              # ldd output example: "libopus-0.dll => /mingw64/bin/libopus-0.dll (0x...)"
-              ldd "$exe" | grep '/mingw64/bin' | awk '{print $3}' | while read dll; do
+              echo "Checking dependencies for $exe..."
+              # Use || true to prevent script failure if grep finds nothing
+              deps=$(ldd "$exe" | grep '/mingw64/bin' | awk '{print $3}' || true)
+              for dll in $deps; do
                 if [ -f "$dll" ]; then
                    echo "Copying $dll..."
                    cp "$dll" release/
