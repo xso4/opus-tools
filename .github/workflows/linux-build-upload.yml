@@ -384,8 +384,58 @@ jobs:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PREFIX }}
 
-  update-json:
+  release:
     needs: [check-upstream, build-opus-tools, build-opus-docs]
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Download version file
+        uses: actions/download-artifact@v4
+        with:
+          name: upstream-version
+          path: .github
+
+      - name: Download opus-tools artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-tools-windows-mingw-static
+          path: release_staging/opus-tools
+
+      - name: Download opus-docs artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-docs
+          path: release_staging/opus-docs
+
+      - name: Generate Release Info
+        id: info
+        run: python .github/scripts/generate_release_info.py
+
+      - name: Create Zip
+        run: |
+          cd release_staging
+          zip -r "../${{ steps.info.outputs.zip_name }}" .
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.info.outputs.tag_name }}" \
+            "${{ steps.info.outputs.zip_name }}" \
+            --title "${{ steps.info.outputs.tag_name }}" \
+            --notes-file release_notes.md
+
+  update-json:
+    needs: [check-upstream, release]
     if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     permissions:
