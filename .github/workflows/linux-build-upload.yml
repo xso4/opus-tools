@@ -247,20 +247,20 @@ jobs:
   build-opus-tools:
     name: Build Opus Tools ${{ matrix.config }}
     needs: [build-flac-deps, build-opus-deps]
-    runs-on: ${{ matrix.runs_on }}
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - config: static
-            runs_on: ubuntu-latest
+            os: ubuntu-latest
             shared_flags: --enable-static --disable-shared
             cflags: -O2 -DFLAC__NO_DLL
             ldflags: -static -static-libgcc -static-libstdc++
             pkg_config_cmd: pkg-config --static
             artifact_name: opus-tools-windows-mingw-static
           - config: dynamic
-            runs_on: windows-latest
+            os: windows-latest
             shared_flags: --enable-shared --disable-static
             cflags: -O2
             ldflags: ""
@@ -276,26 +276,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install dependencies (Linux)
-        if: matrix.config == 'static'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y autoconf automake libtool libtool-bin pkg-config make mingw-w64 gettext
 
       - name: Setup MSYS2 (Windows)
-        if: matrix.config == 'dynamic'
+        if: runner.os == 'Windows'
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
           update: true
           install: >-
             base-devel
+            autotools
+            git
             mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-pkg-config
-            autoconf
-            automake
-            libtool
-            make
-            gettext
+            pkg-config
 
       - name: Download flac deps
         uses: actions/download-artifact@v4
@@ -310,7 +307,7 @@ jobs:
           path: ${{ env.PREFIX }}
 
       - name: Build opus-tools (Linux)
-        if: matrix.config == 'static'
+        if: runner.os == 'Linux'
         run: |
           set -eux
           ./autogen.sh
@@ -338,61 +335,56 @@ jobs:
           make install
 
       - name: Build opus-tools (Windows)
-        if: matrix.config == 'dynamic'
+        if: runner.os == 'Windows'
         shell: msys2 {0}
         run: |
-          set -eux
           ./autogen.sh
-          BUILD=$(./config.guess)
           mkdir -p build-${{ matrix.config }}
           cd build-${{ matrix.config }}
-          CC=${HOST}-gcc \
-          CXX=${HOST}-g++ \
-          AR=${HOST}-ar \
-          RANLIB=${HOST}-ranlib \
-          STRIP=${HOST}-strip \
-          WINDRES=${HOST}-windres \
+          
+          # Convert paths to MSYS2 format
+          export PREFIX=$(cygpath -u "$PREFIX")
+          export PKG_CONFIG_PATH=$(cygpath -u "$PKG_CONFIG_PATH")
+          export PKG_CONFIG_LIBDIR=$(cygpath -u "$PKG_CONFIG_LIBDIR")
+          
           PKG_CONFIG="${{ matrix.pkg_config_cmd }}" \
           CFLAGS="${{ matrix.cflags }}" \
           LDFLAGS="${{ matrix.ldflags }}" \
-          PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
-          PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR" \
           ../configure \
-            --host=$HOST \
-            --build=$BUILD \
             --prefix="$PREFIX" \
             --with-flac \
             ${{ matrix.shared_flags }}
-          make -j"$(nproc)"
+          
+          make -j$(nproc)
           make install
 
-      # - name: Package dynamic dependencies
-      #   if: matrix.config == 'dynamic'
-      #   run: |
-      #     set -eux
-      #     # Copy MinGW runtime DLLs
-      #     # Search in common locations for MinGW libraries
-      #     SEARCH_PATHS="/usr/lib/gcc/x86_64-w64-mingw32 /usr/x86_64-w64-mingw32"
-      #
-      #     # Copy libgcc (usually libgcc_s_seh-1.dll for 64-bit)
-      #     find $SEARCH_PATHS -name "libgcc_s_*-1.dll" -exec cp {} "$PREFIX/bin/" \; -quit
-      #
-      #     # Copy libstdc++
-      #     find $SEARCH_PATHS -name "libstdc++-6.dll" -exec cp {} "$PREFIX/bin/" \; -quit
-      #
-      #     # Copy libwinpthread
-      #     find $SEARCH_PATHS -name "libwinpthread-1.dll" -exec cp {} "$PREFIX/bin/" \; -quit
-      #
-      #     # Copy libssp (often missed, causes silent failure)
-      #     find $SEARCH_PATHS -name "libssp-0.dll" -exec cp {} "$PREFIX/bin/" \; -quit
-      #
-      #     # List contents for debugging
-      #     echo "Contents of bin directory:"
-      #     ls -R "$PREFIX/bin"
-      #
-      #     # Check dependencies of the main executable
-      #     echo "Dependencies of opusenc.exe:"
-      #     x86_64-w64-mingw32-objdump -p "$PREFIX/bin/opusenc.exe" | grep "DLL Name" || true
+#      - name: Package dynamic dependencies
+#        if: matrix.config == 'dynamic'
+#        run: |
+#          set -eux
+#          # Copy MinGW runtime DLLs
+#          # Search in common locations for MinGW libraries
+#          SEARCH_PATHS="/usr/lib/gcc/x86_64-w64-mingw32 /usr/x86_64-w64-mingw32"
+#          
+#          # Copy libgcc (usually libgcc_s_seh-1.dll for 64-bit)
+#          find $SEARCH_PATHS -name "libgcc_s_*-1.dll" -exec cp {} "$PREFIX/bin/" \; -quit
+#          
+#          # Copy libstdc++
+#          find $SEARCH_PATHS -name "libstdc++-6.dll" -exec cp {} "$PREFIX/bin/" \; -quit
+#          
+#          # Copy libwinpthread
+#          find $SEARCH_PATHS -name "libwinpthread-1.dll" -exec cp {} "$PREFIX/bin/" \; -quit
+#          
+#          # Copy libssp (often missed, causes silent failure)
+#          find $SEARCH_PATHS -name "libssp-0.dll" -exec cp {} "$PREFIX/bin/" \; -quit
+#
+#          # List contents for debugging
+#          echo "Contents of bin directory:"
+#          ls -R "$PREFIX/bin"
+#          
+#          # Check dependencies of the main executable
+#          echo "Dependencies of opusenc.exe:"
+#          x86_64-w64-mingw32-objdump -p "$PREFIX/bin/opusenc.exe" | grep "DLL Name" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
