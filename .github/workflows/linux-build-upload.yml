@@ -346,6 +346,10 @@ jobs:
           export PREFIX=$(cygpath -u "$PREFIX")
           export PKG_CONFIG_PATH=$(cygpath -u "$PKG_CONFIG_PATH")
           export PKG_CONFIG_LIBDIR=$(cygpath -u "$PKG_CONFIG_LIBDIR")
+
+          # Fix .la files from Linux build
+          echo "Fixing .la files paths..."
+          find "$PREFIX/lib" -name "*.la" -exec sed -i "s|/home/runner/work/opus-tools/opus-tools|$(cygpath -u "$GITHUB_WORKSPACE")|g" {} +
           
           PKG_CONFIG="${{ matrix.pkg_config_cmd }}" \
           CFLAGS="${{ matrix.cflags }}" \
