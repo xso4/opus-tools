@@ -172,6 +172,14 @@ jobs:
     name: Build Opus Tools
     needs: [build-flac-stream, build-opus-stream]
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config_name: Release
+            artifact_type: static
+          - config_name: ReleaseDLL
+            artifact_type: dynamic
     steps:
       - name: Checkout Opus Tools
         uses: actions/checkout@v4
@@ -182,28 +190,16 @@ jobs:
       - name: Add MSBuild to PATH
         uses: microsoft/setup-msbuild@v2
 
-      - name: Download FLAC Release Artifacts
+      - name: Download FLAC Stream Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: deps-flac-Release
+          name: deps-flac-${{ matrix.config_name }}
           path: .
           
-      - name: Download FLAC ReleaseDLL Artifacts
+      - name: Download Opus Stream Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: deps-flac-ReleaseDLL
-          path: .
-
-      - name: Download Opus Release Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: deps-opus-Release
-          path: .
-
-      - name: Download Opus ReleaseDLL Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: deps-opus-ReleaseDLL
+          name: deps-opus-${{ matrix.config_name }}
           path: .
           
       - name: Patch Opus Tools Props (Remove OpenSSL)
@@ -217,34 +213,22 @@ jobs:
           $content = $content -replace "crypt32.lib;", ""
           Set-Content $path $content
 
-      - name: Build Opus Tools (Static Release)
+      - name: Build Opus Tools
         shell: cmd
         working-directory: opus-tools
         run: |
-          msbuild win32\VS2015\opus-tools.sln /m /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0
-
-      - name: Build Opus Tools (Dynamic Release)
-        shell: cmd
-        working-directory: opus-tools
-        run: |
-          msbuild win32\VS2015\opus-tools.sln /m /p:Configuration=ReleaseDLL /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0
+          msbuild win32\VS2015\opus-tools.sln /m /p:Configuration=${{ matrix.config_name }} /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0
 
       - name: Collect Artifacts
         shell: cmd
         run: |
           mkdir artifacts
-          mkdir artifacts\static
-          mkdir artifacts\dynamic
-          copy opus-tools\win32\VS2015\x64\Release\opusenc.exe artifacts\static\
-          copy opus-tools\win32\VS2015\x64\Release\opusdec.exe artifacts\static\
-          copy opus-tools\win32\VS2015\x64\Release\opusinfo.exe artifacts\static\
-          
-          copy opus-tools\win32\VS2015\x64\ReleaseDLL\opusenc.exe artifacts\dynamic\
-          copy opus-tools\win32\VS2015\x64\ReleaseDLL\opusdec.exe artifacts\dynamic\
-          copy opus-tools\win32\VS2015\x64\ReleaseDLL\opusinfo.exe artifacts\dynamic\
+          copy opus-tools\win32\VS2015\x64\${{ matrix.config_name }}\opusenc.exe artifacts\
+          copy opus-tools\win32\VS2015\x64\${{ matrix.config_name }}\opusdec.exe artifacts\
+          copy opus-tools\win32\VS2015\x64\${{ matrix.config_name }}\opusinfo.exe artifacts\
 
       - name: Upload Opus Tools
         uses: actions/upload-artifact@v4
         with:
-          name: opus-tools-windows
+          name: opus-tools-windows-${{ matrix.artifact_type }}
           path: artifacts/
