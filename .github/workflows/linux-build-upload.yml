@@ -222,6 +222,17 @@ jobs:
           
           # Copy libwinpthread
           find $SEARCH_PATHS -name "libwinpthread-1.dll" -exec cp {} "$PREFIX/bin/" \; -quit
+          
+          # Copy libssp (often missed, causes silent failure)
+          find $SEARCH_PATHS -name "libssp-0.dll" -exec cp {} "$PREFIX/bin/" \; -quit
+
+          # List contents for debugging
+          echo "Contents of bin directory:"
+          ls -R "$PREFIX/bin"
+          
+          # Check dependencies of the main executable
+          echo "Dependencies of opusenc.exe:"
+          x86_64-w64-mingw32-objdump -p "$PREFIX/bin/opusenc.exe" | grep "DLL Name" || true
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
