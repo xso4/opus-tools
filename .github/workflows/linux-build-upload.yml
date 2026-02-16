@@ -1,11 +1,37 @@
 name: Linux MinGW Build Upload
 
 on:
+  schedule:
+    - cron: '32 18 15 * *'
   workflow_dispatch:
 
 jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_updated: ${{ steps.check.outputs.upstream_updated }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          
+      - name: Check Upstream
+        id: check
+        run: python .github/scripts/upstream_manager.py
+        
+      - name: Upload version file
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-version
+          path: .github/upstream-version.json
+
   build-flac-deps:
     name: Build Flac Deps
+    needs: check-upstream
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       HOST: x86_64-w64-mingw32
@@ -89,6 +115,8 @@ jobs:
 
   build-opus-deps:
     name: Build Opus Deps
+    needs: check-upstream
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       HOST: x86_64-w64-mingw32
@@ -228,6 +256,8 @@ jobs:
 
   build-opus-docs:
     name: Build Opus Docs
+    needs: check-upstream
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -268,7 +298,8 @@ jobs:
 
   build-opus-tools:
     name: Build Opus Tools
-    needs: [build-flac-deps, build-opus-deps]
+    needs: [build-flac-deps, build-opus-deps, check-upstream]
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     env:
       HOST: x86_64-w64-mingw32
@@ -338,3 +369,30 @@ jobs:
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PREFIX }}
+
+  update-json:
+    needs: [check-upstream, build-opus-tools, build-opus-docs]
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download version file
+        uses: actions/download-artifact@v4
+        with:
+          name: upstream-version
+          path: .github
+          
+      - name: Commit and Push
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .github/upstream-version.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update upstream versions"
+            git push
+          fi
