@@ -4,338 +4,299 @@ on:
   workflow_dispatch:
 
 jobs:
-  # -------------------------------------------------------------------------
-  # FLAC Dependencies (Static & Dynamic)
-  # -------------------------------------------------------------------------
-  flac-static:
+  # 1. Build FLAC Dependencies (Ogg, FLAC)
+  deps-flac:
+    name: FLAC Deps (${{ matrix.type }})
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [Static, Dynamic]
+        include:
+          - type: Static
+            shared: OFF
+            runtime: MultiThreaded
+            config: Release
+          - type: Dynamic
+            shared: ON
+            runtime: MultiThreadedDLL
+            config: Release
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
+      - name: Checkout Ogg
+        uses: actions/checkout@v4
         with:
-          msystem: MINGW64
-          install: >-
-            base-devel
-            autotools
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            git
-      - name: Build Ogg & FLAC (Static)
-        shell: msys2 {0}
+          repository: xiph/ogg
+          path: ogg
+
+      - name: Checkout FLAC
+        uses: actions/checkout@v4
+        with:
+          repository: xiph/flac
+          path: flac
+
+      - name: Build Ogg
+        shell: cmd
         run: |
-          # Setup paths
-          INSTALL_DIR=$(pwd)/install-flac-static
-          mkdir -p $INSTALL_DIR
-          export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
-          export PATH=$INSTALL_DIR/bin:$PATH
+          cmake -S ogg -B build_ogg -A x64 ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }} ^
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.runtime }} ^
+            -DCMAKE_INSTALL_PREFIX=install_ogg
+          cmake --build build_ogg --config Release --parallel
+          cmake --install build_ogg --config Release
 
-          # Build Ogg (Static)
-          echo "Building Ogg (Static)..."
-          cd ogg
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --enable-static --disable-shared
-          make -j$(nproc)
-          make install
-          cd ..
+      - name: Build FLAC
+        shell: cmd
+        run: |
+          cmake -S flac -B build_flac -A x64 ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }} ^
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.runtime }} ^
+            -DCMAKE_INSTALL_PREFIX=install_flac ^
+            -DCMAKE_PREFIX_PATH=%GITHUB_WORKSPACE%\install_ogg
+          cmake --build build_flac --config Release --parallel
+          cmake --install build_flac --config Release
 
-          # Build FLAC (Static)
-          echo "Building FLAC (Static)..."
-          cd flac
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --enable-static --disable-shared --with-ogg=$INSTALL_DIR
-          make -j$(nproc)
-          make install
-          cd ..
+      - name: Prepare Artifacts
+        shell: cmd
+        run: |
+          mkdir dist\flac
+          mkdir dist\ogg
+          xcopy /E /I /Y install_flac dist\flac
+          xcopy /E /I /Y install_ogg dist\ogg
 
-      - name: Upload FLAC Static Artifacts
+      - name: Upload FLAC Deps
         uses: actions/upload-artifact@v4
         with:
-          name: flac-static-deps
-          path: install-flac-static
+          name: flac-deps-${{ matrix.type }}
+          path: dist/
 
-  flac-dynamic:
+  # 2. Build Opus Dependencies (Ogg, Opus, Libopusenc, Opusfile)
+  deps-opus:
+    name: Opus Deps (${{ matrix.type }})
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [Static, Dynamic]
+        include:
+          - type: Static
+            shared: OFF
+            runtime: MultiThreaded
+            msvc_conf: Release
+          - type: Dynamic
+            shared: ON
+            runtime: MultiThreadedDLL
+            msvc_conf: ReleaseDLL
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
+      - name: Checkout Ogg
+        uses: actions/checkout@v4
         with:
-          msystem: MINGW64
-          install: >-
-            base-devel
-            autotools
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            git
-      - name: Build Ogg & FLAC (Dynamic)
-        shell: msys2 {0}
+          repository: xiph/ogg
+          path: ogg
+
+      - name: Checkout Opus
+        uses: actions/checkout@v4
+        with:
+          repository: xiph/opus
+          path: opus
+
+      - name: Checkout Libopusenc
+        uses: actions/checkout@v4
+        with:
+          path: libopusenc
+
+      - name: Checkout Opusfile
+        uses: actions/checkout@v4
+        with:
+          repository: xiph/opusfile
+          path: opusfile
+
+      - name: Add MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build Ogg
+        shell: cmd
         run: |
-          INSTALL_DIR=$(pwd)/install-flac-dynamic
-          mkdir -p $INSTALL_DIR
-          export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
-          export PATH=$INSTALL_DIR/bin:$PATH
+          cmake -S ogg -B build_ogg -A x64 ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }} ^
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.runtime }} ^
+            -DCMAKE_INSTALL_PREFIX=install_ogg
+          cmake --build build_ogg --config Release --parallel
+          cmake --install build_ogg --config Release
 
-          # Build Ogg (Dynamic)
-          echo "Building Ogg (Dynamic)..."
-          cd ogg
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --disable-static --enable-shared
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build FLAC (Dynamic)
-          echo "Building FLAC (Dynamic)..."
-          cd flac
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --disable-static --enable-shared --with-ogg=$INSTALL_DIR
-          make -j$(nproc)
-          make install
-          cd ..
-
-      - name: Upload FLAC Dynamic Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: flac-dynamic-deps
-          path: install-flac-dynamic
-
-  # -------------------------------------------------------------------------
-  # Opus Dependencies (Static & Dynamic)
-  # Includes: ogg, opus, opusfile, libopusenc
-  # -------------------------------------------------------------------------
-  opus-static:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          install: >-
-            base-devel
-            autotools
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            git
-            mingw-w64-x86_64-openssl
-      - name: Build Opus Deps (Static)
-        shell: msys2 {0}
+      - name: Build Opus
+        shell: cmd
         run: |
-          INSTALL_DIR=$(pwd)/install-opus-static
-          mkdir -p $INSTALL_DIR
-          export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
-          export PATH=$INSTALL_DIR/bin:$PATH
+          cmake -S opus -B build_opus -A x64 ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }} ^
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.runtime }} ^
+            -DCMAKE_INSTALL_PREFIX=install_opus
+          cmake --build build_opus --config Release --parallel
+          cmake --install build_opus --config Release
 
-          # Build Ogg (Static) - needed for opusfile
-          echo "Building Ogg (Static)..."
-          cd ogg
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --enable-static --disable-shared
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build Opus (Static)
-          echo "Building Opus (Static)..."
-          cd opus
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --enable-static --disable-shared
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build Opusfile (Static)
-          echo "Building Opusfile (Static)..."
-          cd opusfile
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --enable-static --disable-shared --disable-http
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build libopusenc (Static)
-          echo "Building libopusenc (Static)..."
-          cd libopusenc
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --enable-static --disable-shared
-          make -j$(nproc)
-          make install
-          cd ..
-
-      - name: Upload Opus Static Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: opus-static-deps
-          path: install-opus-static
-
-  opus-dynamic:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          install: >-
-            base-devel
-            autotools
-            mingw-w64-x86_64-toolchain
-            mingw-w64-x86_64-cmake
-            git
-            mingw-w64-x86_64-openssl
-      - name: Build Opus Deps (Dynamic)
-        shell: msys2 {0}
+      - name: Build Libopusenc
+        shell: cmd
         run: |
-          INSTALL_DIR=$(pwd)/install-opus-dynamic
-          mkdir -p $INSTALL_DIR
-          export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
-          export PATH=$INSTALL_DIR/bin:$PATH
-
-          # Build Ogg (Dynamic)
-          echo "Building Ogg (Dynamic)..."
-          cd ogg
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --disable-static --enable-shared
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build Opus (Dynamic)
-          echo "Building Opus (Dynamic)..."
-          cd opus
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --disable-static --enable-shared
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build Opusfile (Dynamic)
-          echo "Building Opusfile (Dynamic)..."
-          cd opusfile
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --disable-static --enable-shared --disable-http
-          make -j$(nproc)
-          make install
-          cd ..
-
-          # Build libopusenc (Dynamic)
-          echo "Building libopusenc (Dynamic)..."
-          cd libopusenc
-          ./autogen.sh
-          ./configure --prefix=$INSTALL_DIR --disable-static --enable-shared
-          make -j$(nproc)
-          make install
-          cd ..
-
-      - name: Upload Opus Dynamic Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: opus-dynamic-deps
-          path: install-opus-dynamic
-
-  # -------------------------------------------------------------------------
-  # Opus Tools (Static & Dynamic)
-  # -------------------------------------------------------------------------
-  opus-tools-static:
-    needs: [flac-static, opus-static]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          install: >-
-            base-devel
-            autotools
-            mingw-w64-x86_64-toolchain
-            git
-            mingw-w64-x86_64-openssl
-
-      - name: Download FLAC Static Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: flac-static-deps
-          path: install-deps
-
-      - name: Download Opus Static Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: opus-static-deps
-          path: install-deps
-
-      - name: Build Opus Tools (Static)
-        shell: msys2 {0}
-        run: |
-          INSTALL_DIR=$(pwd)/install-deps
-          OUTPUT_DIR=$(pwd)/opus-tools-static-bin
-          mkdir -p $OUTPUT_DIR
-          export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
-          export PATH=$INSTALL_DIR/bin:$PATH
-
-          echo "Building Opus Tools (Static)..."
-          cd opus-tools
-          ./autogen.sh
-          ./configure --prefix=$OUTPUT_DIR --enable-static --disable-shared
-          make -j$(nproc)
-          make install
-          cd ..
+          REM Prepare Opus libs for Libopusenc VS solution
+          mkdir opus\win32\VS2015\x64\${{ matrix.msvc_conf }}
+          copy build_opus\Release\opus.lib opus\win32\VS2015\x64\${{ matrix.msvc_conf }}\opus.lib
           
-          # Copy executables for artifact upload
-          cp $OUTPUT_DIR/bin/*.exe $OUTPUT_DIR/
+          REM Build Libopusenc
+          msbuild libopusenc\win32\VS2015\opusenc.sln /m /p:Configuration=${{ matrix.msvc_conf }} /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0
 
-      - name: Upload Opus Tools Static
-        uses: actions/upload-artifact@v4
-        with:
-          name: opus-tools-static
-          path: opus-tools-static-bin/*.exe
-
-  opus-tools-dynamic:
-    needs: [flac-dynamic, opus-dynamic]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: msys2/setup-msys2@v2
-        with:
-          msystem: MINGW64
-          install: >-
-            base-devel
-            autotools
-            mingw-w64-x86_64-toolchain
-            git
-            mingw-w64-x86_64-openssl
-
-      - name: Download FLAC Dynamic Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: flac-dynamic-deps
-          path: install-deps
-
-      - name: Download Opus Dynamic Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: opus-dynamic-deps
-          path: install-deps
-
-      - name: Build Opus Tools (Dynamic)
-        shell: msys2 {0}
+      - name: Build Opusfile
+        shell: cmd
         run: |
-          INSTALL_DIR=$(pwd)/install-deps
-          OUTPUT_DIR=$(pwd)/opus-tools-dynamic-bin
-          mkdir -p $OUTPUT_DIR
-          export PKG_CONFIG_PATH=$INSTALL_DIR/lib/pkgconfig
-          export PATH=$INSTALL_DIR/bin:$PATH
+          cmake -S opusfile -B build_opusfile -A x64 ^
+            -DCMAKE_BUILD_TYPE=Release ^
+            -DBUILD_SHARED_LIBS=${{ matrix.shared }} ^
+            -DCMAKE_MSVC_RUNTIME_LIBRARY=${{ matrix.runtime }} ^
+            -DCMAKE_INSTALL_PREFIX=install_opusfile ^
+            -DCMAKE_PREFIX_PATH="%GITHUB_WORKSPACE%\install_ogg;%GITHUB_WORKSPACE%\install_opus" ^
+            -DOP_DISABLE_HTTP=ON
+          cmake --build build_opusfile --config Release --parallel
+          cmake --install build_opusfile --config Release
 
-          echo "Building Opus Tools (Dynamic)..."
-          cd opus-tools
-          ./autogen.sh
-          ./configure --prefix=$OUTPUT_DIR --disable-static --enable-shared
-          make -j$(nproc)
-          make install
-          cd ..
+      - name: Prepare Artifacts
+        shell: cmd
+        run: |
+          mkdir dist\ogg
+          mkdir dist\opus
+          mkdir dist\opusfile
+          mkdir dist\libopusenc
+          
+          xcopy /E /I /Y install_ogg dist\ogg
+          xcopy /E /I /Y install_opus dist\opus
+          xcopy /E /I /Y install_opusfile dist\opusfile
+          
+          REM Collect Libopusenc artifacts manually from VS output
+          mkdir dist\libopusenc\lib
+          mkdir dist\libopusenc\include
+          copy libopusenc\win32\VS2015\x64\${{ matrix.msvc_conf }}\opusenc.lib dist\libopusenc\lib\
+          if exist libopusenc\win32\VS2015\x64\${{ matrix.msvc_conf }}\opusenc.dll copy libopusenc\win32\VS2015\x64\${{ matrix.msvc_conf }}\opusenc.dll dist\libopusenc\lib\
+          copy libopusenc\include\opusenc.h dist\libopusenc\include\
 
-          # Copy executables and DLLs for artifact upload
-          cp $OUTPUT_DIR/bin/*.exe $OUTPUT_DIR/
-          cp $INSTALL_DIR/bin/*.dll $OUTPUT_DIR/
-
-      - name: Upload Opus Tools Dynamic
+      - name: Upload Opus Deps
         uses: actions/upload-artifact@v4
         with:
-          name: opus-tools-dynamic
-          path: opus-tools-dynamic-bin/*
+          name: opus-deps-${{ matrix.type }}
+          path: dist/
+
+  # 3. Build Opus Tools
+  build-tools:
+    name: Opus Tools (${{ matrix.type }})
+    needs: [deps-flac, deps-opus]
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        type: [Static, Dynamic]
+        include:
+          - type: Static
+            msvc_conf: Release
+          - type: Dynamic
+            msvc_conf: ReleaseDLL
+
+    steps:
+      - name: Checkout Opus Tools
+        uses: actions/checkout@v4
+        with:
+          path: opus-tools
+
+      - name: Add MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Download FLAC Deps
+        uses: actions/download-artifact@v4
+        with:
+          name: flac-deps-${{ matrix.type }}
+          path: deps
+
+      - name: Download Opus Deps
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-deps-${{ matrix.type }}
+          path: deps
+
+      - name: Organize Dependencies for VS Solution
+        shell: cmd
+        working-directory: deps
+        run: |
+          REM We need to restructure the downloaded 'deps' folder to match what opus-tools.sln expects
+          REM Expected: ..\..\..\<lib>\win32\VS2015\x64\<Conf>
+          
+          set CONF=${{ matrix.msvc_conf }}
+          
+          REM 1. Ogg
+          mkdir ogg\win32\VS2015\x64\%CONF%
+          REM CMake installs to lib/ogg.lib, VS expects libogg.lib?
+          if exist ogg\lib\ogg.lib copy ogg\lib\ogg.lib ogg\win32\VS2015\x64\%CONF%\libogg.lib
+          if exist ogg\lib\libogg.lib copy ogg\lib\libogg.lib ogg\win32\VS2015\x64\%CONF%\libogg.lib
+          xcopy /E /I /Y ogg\include ogg\include
+          
+          REM 2. Opus
+          mkdir opus\win32\VS2015\x64\%CONF%
+          if exist opus\lib\opus.lib copy opus\lib\opus.lib opus\win32\VS2015\x64\%CONF%\opus.lib
+          xcopy /E /I /Y opus\include opus\include
+          
+          REM 3. Libopusenc
+          mkdir libopusenc\win32\VS2015\x64\%CONF%
+          copy libopusenc\lib\opusenc.lib libopusenc\win32\VS2015\x64\%CONF%\opusenc.lib
+          if exist libopusenc\lib\opusenc.dll copy libopusenc\lib\opusenc.dll libopusenc\win32\VS2015\x64\%CONF%\opusenc.dll
+          xcopy /E /I /Y libopusenc\include libopusenc\include
+          
+          REM 4. Opusfile
+          mkdir opusfile\win32\VS2015\x64\%CONF%
+          if exist opusfile\lib\opusfile.lib copy opusfile\lib\opusfile.lib opusfile\win32\VS2015\x64\%CONF%\opusfile.lib
+          xcopy /E /I /Y opusfile\include opusfile\include
+          
+          REM 5. FLAC
+          REM Expected: ..\..\..\flac\objs\$(Platform)\$(Configuration)\lib
+          REM Note: opus-tools props says: objs\$(Platform)\$(Configuration)\lib
+          REM So we need flac\objs\x64\Release\lib
+          mkdir flac\objs\x64\%CONF%\lib
+          if exist flac\lib\FLAC.lib copy flac\lib\FLAC.lib flac\objs\x64\%CONF%\lib\libFLAC.lib
+          if exist flac\lib\libFLAC.lib copy flac\lib\libFLAC.lib flac\objs\x64\%CONF%\lib\libFLAC.lib
+          xcopy /E /I /Y flac\include flac\include
+
+      - name: Patch Project Files (Remove OpenSSL)
+        shell: powershell
+        working-directory: opus-tools
+        run: |
+          # Remove libeay32.lib and ssleay32.lib from Linker dependencies
+          $files = Get-ChildItem -Recurse -Filter "*.vcxproj"
+          foreach ($file in $files) {
+            (Get-Content $file.FullName) -replace 'libeay32.lib;', '' -replace 'ssleay32.lib;', '' -replace 'ws2_32.lib;', '' -replace 'crypt32.lib;', '' | Set-Content $file.FullName
+          }
+
+      - name: Build Opus Tools
+        shell: cmd
+        working-directory: opus-tools
+        run: |
+          REM Move deps so they are peers of opus-tools directory
+          move ..\deps\ogg ..\ogg
+          move ..\deps\opus ..\opus
+          move ..\deps\libopusenc ..\libopusenc
+          move ..\deps\opusfile ..\opusfile
+          move ..\deps\flac ..\flac
+          
+          msbuild win32\VS2015\opus-tools.sln /m /p:Configuration=${{ matrix.msvc_conf }} /p:Platform=x64 /p:PlatformToolset=v143 /p:WindowsTargetPlatformVersion=10.0
+
+      - name: Collect Output
+        shell: cmd
+        working-directory: opus-tools
+        run: |
+          mkdir dist
+          copy win32\VS2015\x64\${{ matrix.msvc_conf }}\*.exe dist\
+          if exist win32\VS2015\x64\${{ matrix.msvc_conf }}\*.dll copy win32\VS2015\x64\${{ matrix.msvc_conf }}\*.dll dist\
+
+      - name: Upload Opus Tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: opus-tools-${{ matrix.type }}
+          path: opus-tools/dist/
