@@ -10,6 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       upstream_updated: ${{ steps.check.outputs.upstream_updated }}
+      ogg_hash: ${{ steps.check.outputs.ogg_hash }}
+      flac_hash: ${{ steps.check.outputs.flac_hash }}
+      opus_hash: ${{ steps.check.outputs.opus_hash }}
+      libopusenc_hash: ${{ steps.check.outputs.libopusenc_hash }}
+      opusfile_hash: ${{ steps.check.outputs.opusfile_hash }}
+      opus_tools_hash: ${{ steps.check.outputs.opus_tools_hash }}
     steps:
       - uses: actions/checkout@v4
       
@@ -55,7 +61,9 @@ jobs:
           mkdir -p "$SRC_DIR"
           cd "$SRC_DIR"
           git clone https://gitlab.xiph.org/xiph/ogg.git
+          git -C ogg checkout ${{ needs.check-upstream.outputs.ogg_hash }}
           git clone https://gitlab.xiph.org/xiph/flac.git
+          git -C flac checkout ${{ needs.check-upstream.outputs.flac_hash }}
 
       - name: Build libogg
         run: |
@@ -140,9 +148,13 @@ jobs:
           mkdir -p "$SRC_DIR"
           cd "$SRC_DIR"
           git clone https://gitlab.xiph.org/xiph/ogg.git
+          git -C ogg checkout ${{ needs.check-upstream.outputs.ogg_hash }}
           git clone https://gitlab.xiph.org/xiph/opus.git
+          git -C opus checkout ${{ needs.check-upstream.outputs.opus_hash }}
           git clone https://gitlab.xiph.org/xiph/opusfile.git
+          git -C opusfile checkout ${{ needs.check-upstream.outputs.opusfile_hash }}
           git clone https://gitlab.xiph.org/xiph/libopusenc.git
+          git -C libopusenc checkout ${{ needs.check-upstream.outputs.libopusenc_hash }}
 
       - name: Build libogg
         run: |
@@ -264,6 +276,7 @@ jobs:
         with:
           repository: xiph/opus
           path: opus
+          ref: ${{ needs.check-upstream.outputs.opus_hash }}
 
       - name: Install dependencies
         run: |
@@ -322,6 +335,7 @@ jobs:
         run: |
           set -eux
           git clone https://gitlab.xiph.org/xiph/opus-tools.git
+          git -C opus-tools checkout ${{ needs.check-upstream.outputs.opus_tools_hash }}
 
       - name: Download flac deps
         uses: actions/download-artifact@v4
