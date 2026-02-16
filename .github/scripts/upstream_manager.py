@@ -52,6 +52,19 @@ def get_commit_details(url, commit_hash):
     finally:
         shutil.rmtree(temp_dir, ignore_errors=True)
 
+def get_commit_url(repo_url, commit_hash):
+    base_url = repo_url.rstrip("/")
+    if base_url.endswith(".git"):
+        base_url = base_url[:-4]
+        
+    if "gitlab" in base_url:
+        return f"{base_url}/-/commit/{commit_hash}"
+    elif "bitbucket" in base_url:
+        return f"{base_url}/commits/{commit_hash}"
+    else:
+        # Default to GitHub-style /commit/ which works for GitHub, Gitee, etc.
+        return f"{base_url}/commit/{commit_hash}"
+
 def main():
     # Load existing
     if os.path.exists(JSON_FILE):
@@ -92,10 +105,13 @@ def main():
                 "name": name,
                 "url": url,
                 "commit_hash": remote_hash,
-                "commit_url": f"{url.rstrip('.git')}/-/commit/{remote_hash}",
+                "commit_url": get_commit_url(url, remote_hash),
                 "commit_time": commit_time
             }
         else:
+            # Update commit_url even if hash is the same, to support logic changes
+            if "commit_hash" in current_info:
+                current_info["commit_url"] = get_commit_url(url, current_info["commit_hash"])
             new_data[name] = current_info
 
     # Save to file
