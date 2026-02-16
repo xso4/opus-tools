@@ -113,5 +113,14 @@ def main():
             with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                 f.write("upstream_updated=false\n")
 
+    # Always output current hashes
+    if os.getenv("GITHUB_OUTPUT"):
+        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+            for name, info in new_data.items():
+                key = f"{name.replace('-', '_')}_hash"
+                value = info.get("commit_hash", "")
+                if value:
+                    f.write(f"{key}={value}\n")
+
 if __name__ == "__main__":
     main()
