@@ -5,22 +5,17 @@ on:
 
 jobs:
   build-flac-deps:
-    name: Build Flac Deps ${{ matrix.config }}
+    name: Build Flac Deps
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - config: static
-            shared_flags: --enable-static --disable-shared
-            cflags: -O2 -DFLAC__NO_DLL
-            ldflags: -static -static-libgcc -static-libstdc++
     env:
       HOST: x86_64-w64-mingw32
-      PREFIX: ${{ github.workspace }}/mingw/${{ matrix.config }}
-      SRC_DIR: ${{ github.workspace }}/_deps/${{ matrix.config }}
-      PKG_CONFIG_PATH: ${{ github.workspace }}/mingw/${{ matrix.config }}/lib/pkgconfig
-      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/mingw/${{ matrix.config }}/lib/pkgconfig
+      PREFIX: ${{ github.workspace }}/mingw/static
+      SRC_DIR: ${{ github.workspace }}/_deps/static
+      PKG_CONFIG_PATH: ${{ github.workspace }}/mingw/static/lib/pkgconfig
+      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/mingw/static/lib/pkgconfig
+      SHARED_FLAGS: --enable-static --disable-shared
+      CFLAGS: -O2 -DFLAC__NO_DLL
+      LDFLAGS: -static -static-libgcc -static-libstdc++
 
     steps:
       - name: Install dependencies
@@ -42,21 +37,21 @@ jobs:
           cd "$SRC_DIR/ogg"
           ./autogen.sh
           BUILD=$(./config.guess)
-          mkdir -p build-${{ matrix.config }}
-          cd build-${{ matrix.config }}
+          mkdir -p build-static
+          cd build-static
           CC=${HOST}-gcc \
           CXX=${HOST}-g++ \
           AR=${HOST}-ar \
           RANLIB=${HOST}-ranlib \
           STRIP=${HOST}-strip \
           WINDRES=${HOST}-windres \
-          CFLAGS="${{ matrix.cflags }}" \
-          LDFLAGS="${{ matrix.ldflags }}" \
+          CFLAGS="$CFLAGS" \
+          LDFLAGS="$LDFLAGS" \
           ../configure \
             --host=$HOST \
             --build=$BUILD \
             --prefix="$PREFIX" \
-            ${{ matrix.shared_flags }}
+            $SHARED_FLAGS
           make -j"$(nproc)"
           make install
 
@@ -66,49 +61,44 @@ jobs:
           cd "$SRC_DIR/flac"
           ./autogen.sh
           BUILD=$(./config.guess)
-          mkdir -p build-${{ matrix.config }}
-          cd build-${{ matrix.config }}
+          mkdir -p build-static
+          cd build-static
           CC=${HOST}-gcc \
           CXX=${HOST}-g++ \
           AR=${HOST}-ar \
           RANLIB=${HOST}-ranlib \
           STRIP=${HOST}-strip \
           WINDRES=${HOST}-windres \
-          CFLAGS="${{ matrix.cflags }}" \
-          LDFLAGS="${{ matrix.ldflags }}" \
+          CFLAGS="$CFLAGS" \
+          LDFLAGS="$LDFLAGS" \
           PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
           PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR" \
           ../configure \
             --host=$HOST \
             --build=$BUILD \
             --prefix="$PREFIX" \
-            ${{ matrix.shared_flags }}
+            $SHARED_FLAGS
           make -j"$(nproc)"
           make install
 
       - name: Upload flac deps
         uses: actions/upload-artifact@v4
         with:
-          name: flac-deps-${{ matrix.config }}
+          name: flac-deps
           path: ${{ env.PREFIX }}
 
   build-opus-deps:
-    name: Build Opus Deps ${{ matrix.config }}
+    name: Build Opus Deps
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - config: static
-            shared_flags: --enable-static --disable-shared
-            cflags: -O2 -DFLAC__NO_DLL
-            ldflags: -static -static-libgcc -static-libstdc++
     env:
       HOST: x86_64-w64-mingw32
-      PREFIX: ${{ github.workspace }}/mingw/${{ matrix.config }}
-      SRC_DIR: ${{ github.workspace }}/_deps/${{ matrix.config }}
-      PKG_CONFIG_PATH: ${{ github.workspace }}/mingw/${{ matrix.config }}/lib/pkgconfig
-      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/mingw/${{ matrix.config }}/lib/pkgconfig
+      PREFIX: ${{ github.workspace }}/mingw/static
+      SRC_DIR: ${{ github.workspace }}/_deps/static
+      PKG_CONFIG_PATH: ${{ github.workspace }}/mingw/static/lib/pkgconfig
+      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/mingw/static/lib/pkgconfig
+      SHARED_FLAGS: --enable-static --disable-shared
+      CFLAGS: -O2 -DFLAC__NO_DLL
+      LDFLAGS: -static -static-libgcc -static-libstdc++
 
     steps:
       - name: Install dependencies
@@ -132,21 +122,21 @@ jobs:
           cd "$SRC_DIR/ogg"
           ./autogen.sh
           BUILD=$(./config.guess)
-          mkdir -p build-${{ matrix.config }}
-          cd build-${{ matrix.config }}
+          mkdir -p build-static
+          cd build-static
           CC=${HOST}-gcc \
           CXX=${HOST}-g++ \
           AR=${HOST}-ar \
           RANLIB=${HOST}-ranlib \
           STRIP=${HOST}-strip \
           WINDRES=${HOST}-windres \
-          CFLAGS="${{ matrix.cflags }}" \
-          LDFLAGS="${{ matrix.ldflags }}" \
+          CFLAGS="$CFLAGS" \
+          LDFLAGS="$LDFLAGS" \
           ../configure \
             --host=$HOST \
             --build=$BUILD \
             --prefix="$PREFIX" \
-            ${{ matrix.shared_flags }}
+            $SHARED_FLAGS
           make -j"$(nproc)"
           make install
 
@@ -157,21 +147,21 @@ jobs:
           ./update_version
           ./autogen.sh
           BUILD=$(./config.guess)
-          mkdir -p build-${{ matrix.config }}
-          cd build-${{ matrix.config }}
+          mkdir -p build-static
+          cd build-static
           CC=${HOST}-gcc \
           CXX=${HOST}-g++ \
           AR=${HOST}-ar \
           RANLIB=${HOST}-ranlib \
           STRIP=${HOST}-strip \
           WINDRES=${HOST}-windres \
-          CFLAGS="${{ matrix.cflags }}" \
-          LDFLAGS="${{ matrix.ldflags }}" \
+          CFLAGS="$CFLAGS" \
+          LDFLAGS="$LDFLAGS" \
           ../configure \
             --host=$HOST \
             --build=$BUILD \
             --prefix="$PREFIX" \
-            ${{ matrix.shared_flags }}
+            $SHARED_FLAGS
           make -j"$(nproc)"
           make install
 
@@ -181,16 +171,16 @@ jobs:
           cd "$SRC_DIR/opusfile"
           ./autogen.sh
           BUILD=$(./config.guess)
-          mkdir -p build-${{ matrix.config }}
-          cd build-${{ matrix.config }}
+          mkdir -p build-static
+          cd build-static
           CC=${HOST}-gcc \
           CXX=${HOST}-g++ \
           AR=${HOST}-ar \
           RANLIB=${HOST}-ranlib \
           STRIP=${HOST}-strip \
           WINDRES=${HOST}-windres \
-          CFLAGS="${{ matrix.cflags }}" \
-          LDFLAGS="${{ matrix.ldflags }}" \
+          CFLAGS="$CFLAGS" \
+          LDFLAGS="$LDFLAGS" \
           PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
           PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR" \
           ../configure \
@@ -200,7 +190,7 @@ jobs:
             --disable-http \
             --disable-doc \
             --disable-examples \
-            ${{ matrix.shared_flags }}
+            $SHARED_FLAGS
           make -j"$(nproc)"
           make install
 
@@ -210,51 +200,46 @@ jobs:
           cd "$SRC_DIR/libopusenc"
           ./autogen.sh
           BUILD=$(./config.guess)
-          mkdir -p build-${{ matrix.config }}
-          cd build-${{ matrix.config }}
+          mkdir -p build-static
+          cd build-static
           CC=${HOST}-gcc \
           CXX=${HOST}-g++ \
           AR=${HOST}-ar \
           RANLIB=${HOST}-ranlib \
           STRIP=${HOST}-strip \
           WINDRES=${HOST}-windres \
-          CFLAGS="${{ matrix.cflags }}" \
-          LDFLAGS="${{ matrix.ldflags }}" \
+          CFLAGS="$CFLAGS" \
+          LDFLAGS="$LDFLAGS" \
           PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
           PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR" \
           ../configure \
             --host=$HOST \
             --build=$BUILD \
             --prefix="$PREFIX" \
-            ${{ matrix.shared_flags }}
+            $SHARED_FLAGS
           make -j"$(nproc)"
           make install
 
       - name: Upload opus deps
         uses: actions/upload-artifact@v4
         with:
-          name: opus-deps-${{ matrix.config }}
+          name: opus-deps
           path: ${{ env.PREFIX }}
 
   build-opus-tools:
-    name: Build Opus Tools ${{ matrix.config }}
+    name: Build Opus Tools
     needs: [build-flac-deps, build-opus-deps]
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - config: static
-            shared_flags: --enable-static --disable-shared
-            cflags: -O2 -DFLAC__NO_DLL
-            ldflags: -static -static-libgcc -static-libstdc++
-            pkg_config_cmd: pkg-config --static
-            artifact_name: opus-tools-windows-mingw-static
     env:
       HOST: x86_64-w64-mingw32
-      PREFIX: ${{ github.workspace }}/mingw/${{ matrix.config }}
-      PKG_CONFIG_PATH: ${{ github.workspace }}/mingw/${{ matrix.config }}/lib/pkgconfig
-      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/mingw/${{ matrix.config }}/lib/pkgconfig
+      PREFIX: ${{ github.workspace }}/mingw/static
+      PKG_CONFIG_PATH: ${{ github.workspace }}/mingw/static/lib/pkgconfig
+      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/mingw/static/lib/pkgconfig
+      SHARED_FLAGS: --enable-static --disable-shared
+      CFLAGS: -O2 -DFLAC__NO_DLL
+      LDFLAGS: -static -static-libgcc -static-libstdc++
+      PKG_CONFIG_CMD: pkg-config --static
+      ARTIFACT_NAME: opus-tools-windows-mingw-static
 
     steps:
       - uses: actions/checkout@v4
@@ -267,13 +252,13 @@ jobs:
       - name: Download flac deps
         uses: actions/download-artifact@v4
         with:
-          name: flac-deps-${{ matrix.config }}
+          name: flac-deps
           path: ${{ env.PREFIX }}
 
       - name: Download opus deps
         uses: actions/download-artifact@v4
         with:
-          name: opus-deps-${{ matrix.config }}
+          name: opus-deps
           path: ${{ env.PREFIX }}
 
       - name: Build opus-tools
@@ -281,17 +266,17 @@ jobs:
           set -eux
           ./autogen.sh
           BUILD=$(./config.guess)
-          mkdir -p build-${{ matrix.config }}
-          cd build-${{ matrix.config }}
+          mkdir -p build-static
+          cd build-static
           CC=${HOST}-gcc \
           CXX=${HOST}-g++ \
           AR=${HOST}-ar \
           RANLIB=${HOST}-ranlib \
           STRIP=${HOST}-strip \
           WINDRES=${HOST}-windres \
-          PKG_CONFIG="${{ matrix.pkg_config_cmd }}" \
-          CFLAGS="${{ matrix.cflags }}" \
-          LDFLAGS="${{ matrix.ldflags }}" \
+          PKG_CONFIG="$PKG_CONFIG_CMD" \
+          CFLAGS="$CFLAGS" \
+          LDFLAGS="$LDFLAGS" \
           PKG_CONFIG_PATH="$PKG_CONFIG_PATH" \
           PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR" \
           ../configure \
@@ -299,7 +284,7 @@ jobs:
             --build=$BUILD \
             --prefix="$PREFIX" \
             --with-flac \
-            ${{ matrix.shared_flags }}
+            $SHARED_FLAGS
           make -j"$(nproc)"
           make install
 
@@ -307,5 +292,5 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PREFIX }}
