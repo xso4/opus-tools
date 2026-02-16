@@ -232,9 +232,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          repository: xiph/opus-tools
-          path: opus-tools
-        with:
           repository: xiph/opus
           path: opus
 
@@ -285,12 +282,15 @@ jobs:
       ARTIFACT_NAME: opus-tools-windows-mingw-static
 
     steps:
-      - uses: actions/checkout@v4
-
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y autoconf automake libtool libtool-bin pkg-config make mingw-w64 gettext
+
+      - name: Fetch opus-tools source
+        run: |
+          set -eux
+          git clone https://gitlab.xiph.org/xiph/opus-tools.git
 
       - name: Download flac deps
         uses: actions/download-artifact@v4
@@ -305,9 +305,9 @@ jobs:
           path: ${{ env.PREFIX }}
 
       - name: Build opus-tools
-        working-directory: opus-tools
         run: |
           set -eux
+          cd opus-tools
           ./autogen.sh
           BUILD=$(./config.guess)
           mkdir -p build-static
