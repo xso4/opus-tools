@@ -232,6 +232,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          repository: xiph/opus-tools
+          path: opus-tools
+        with:
           repository: xiph/opus
           path: opus
 
@@ -302,6 +305,7 @@ jobs:
           path: ${{ env.PREFIX }}
 
       - name: Build opus-tools
+        working-directory: opus-tools
         run: |
           set -eux
           ./autogen.sh
