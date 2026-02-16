@@ -1,0 +1,466 @@
+name: All Windows Build Update
+
+on:
+  schedule:
+    - cron: '32 18 15 * *'
+  workflow_dispatch:
+
+jobs:
+  check-upstream:
+    runs-on: ubuntu-latest
+    outputs:
+      upstream_updated: ${{ steps.check.outputs.upstream_updated }}
+      ogg_hash: ${{ steps.check.outputs.ogg_hash }}
+      flac_hash: ${{ steps.check.outputs.flac_hash }}
+      opus_hash: ${{ steps.check.outputs.opus_hash }}
+      libopusenc_hash: ${{ steps.check.outputs.libopusenc_hash }}
+      opusfile_hash: ${{ steps.check.outputs.opusfile_hash }}
+      opus_tools_hash: ${{ steps.check.outputs.opus_tools_hash }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+          
+      - name: Check Upstream
+        id: check
+        run: python .github/scripts/upstream_manager.py
+        
+      - name: Upload version file
+        uses: actions/upload-artifact@v4
+        with:
+          name: upstream-version
+          path: .github/upstream-version.json
+
+  build-flac-deps:
+    name: Build Flac Deps
+    needs: check-upstream
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [static, dynamic]
+        include:
+          - config: static
+            configure_args: --enable-static --disable-shared
+            ldflags: -static -static-libgcc -static-libstdc++
+            cflags: -O2 -DFLAC__NO_DLL
+            pkg_config_cmd: pkg-config --static
+          - config: dynamic
+            configure_args: --enable-shared --disable-static
+            ldflags: ""
+            cflags: -O2
+            pkg_config_cmd: pkg-config
+    env:
+      PREFIX: ${{ github.workspace }}/install/${{ matrix.config }}
+      SRC_DIR: ${{ github.workspace }}/_deps/${{ matrix.config }}
+      PKG_CONFIG_PATH: ${{ github.workspace }}/install/${{ matrix.config }}/lib/pkgconfig
+      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/install/${{ matrix.config }}/lib/pkgconfig
+
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            autotools
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-pkg-config
+            gettext
+
+      - name: Fetch dependency sources
+        shell: msys2 {0}
+        run: |
+          mkdir -p "$SRC_DIR"
+          cd "$SRC_DIR"
+          git clone https://gitlab.xiph.org/xiph/ogg.git
+          git -C ogg checkout ${{ needs.check-upstream.outputs.ogg_hash }}
+          git clone https://gitlab.xiph.org/xiph/flac.git
+          git -C flac checkout ${{ needs.check-upstream.outputs.flac_hash }}
+
+      - name: Build libogg
+        shell: msys2 {0}
+        run: |
+          cd "$SRC_DIR/ogg"
+          ./autogen.sh
+          mkdir -p build-${{ matrix.config }}
+          cd build-${{ matrix.config }}
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
+          ../configure \
+            --prefix="$PREFIX" \
+            ${{ matrix.configure_args }}
+          make -j$(nproc)
+          make install
+
+      - name: Build flac
+        shell: msys2 {0}
+        run: |
+          cd "$SRC_DIR/flac"
+          ./autogen.sh
+          mkdir -p build-${{ matrix.config }}
+          cd build-${{ matrix.config }}
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
+          export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+          export PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR"
+          ../configure \
+            --prefix="$PREFIX" \
+            ${{ matrix.configure_args }}
+          make -j$(nproc)
+          make install
+
+      - name: Upload flac deps
+        uses: actions/upload-artifact@v4
+        with:
+          name: flac-deps-${{ matrix.config }}
+          path: ${{ env.PREFIX }}
+
+  build-opus-deps:
+    name: Build Opus Deps
+    needs: check-upstream
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [static, dynamic]
+        include:
+          - config: static
+            configure_args: --enable-static --disable-shared
+            ldflags: -static -static-libgcc -static-libstdc++
+            cflags: -O2 -DFLAC__NO_DLL
+            pkg_config_cmd: pkg-config --static
+          - config: dynamic
+            configure_args: --enable-shared --disable-static
+            ldflags: ""
+            cflags: -O2
+            pkg_config_cmd: pkg-config
+    env:
+      PREFIX: ${{ github.workspace }}/install/${{ matrix.config }}
+      SRC_DIR: ${{ github.workspace }}/_deps/${{ matrix.config }}
+      PKG_CONFIG_PATH: ${{ github.workspace }}/install/${{ matrix.config }}/lib/pkgconfig
+      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/install/${{ matrix.config }}/lib/pkgconfig
+
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            autotools
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-pkg-config
+            gettext
+
+      - name: Fetch dependency sources
+        shell: msys2 {0}
+        run: |
+          mkdir -p "$SRC_DIR"
+          cd "$SRC_DIR"
+          git clone https://gitlab.xiph.org/xiph/ogg.git
+          git -C ogg checkout ${{ needs.check-upstream.outputs.ogg_hash }}
+          git clone https://gitlab.xiph.org/xiph/opus.git
+          git -C opus checkout ${{ needs.check-upstream.outputs.opus_hash }}
+          git clone https://gitlab.xiph.org/xiph/opusfile.git
+          git -C opusfile checkout ${{ needs.check-upstream.outputs.opusfile_hash }}
+          git clone https://gitlab.xiph.org/xiph/libopusenc.git
+          git -C libopusenc checkout ${{ needs.check-upstream.outputs.libopusenc_hash }}
+
+      - name: Build libogg
+        shell: msys2 {0}
+        run: |
+          cd "$SRC_DIR/ogg"
+          ./autogen.sh
+          mkdir -p build-${{ matrix.config }}
+          cd build-${{ matrix.config }}
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
+          ../configure \
+            --prefix="$PREFIX" \
+            ${{ matrix.configure_args }}
+          make -j$(nproc)
+          make install
+
+      - name: Build opus
+        shell: msys2 {0}
+        run: |
+          cd "$SRC_DIR/opus"
+          ./autogen.sh
+          mkdir -p build-${{ matrix.config }}
+          cd build-${{ matrix.config }}
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
+          ../configure \
+            --prefix="$PREFIX" \
+            ${{ matrix.configure_args }}
+          make -j$(nproc)
+          make install
+
+      - name: Build opusfile
+        shell: msys2 {0}
+        run: |
+          cd "$SRC_DIR/opusfile"
+          ./autogen.sh
+          mkdir -p build-${{ matrix.config }}
+          cd build-${{ matrix.config }}
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
+          export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+          export PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR"
+          ../configure \
+            --prefix="$PREFIX" \
+            --disable-http \
+            --disable-doc \
+            --disable-examples \
+            ${{ matrix.configure_args }}
+          make -j$(nproc)
+          make install
+
+      - name: Build libopusenc
+        shell: msys2 {0}
+        run: |
+          cd "$SRC_DIR/libopusenc"
+          ./autogen.sh
+          mkdir -p build-${{ matrix.config }}
+          cd build-${{ matrix.config }}
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
+          export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+          export PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR"
+          ../configure \
+            --prefix="$PREFIX" \
+            ${{ matrix.configure_args }}
+          make -j$(nproc)
+          make install
+
+      - name: Upload opus deps
+        uses: actions/upload-artifact@v4
+        with:
+          name: opus-deps-${{ matrix.config }}
+          path: ${{ env.PREFIX }}
+
+  build-opus-docs:
+    name: Build Opus Docs
+    needs: check-upstream
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: xiph/opus
+          path: opus
+          ref: ${{ needs.check-upstream.outputs.opus_hash }}
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz pandoc groff
+
+      - name: Configure
+        working-directory: opus
+        run: |
+          ./autogen.sh
+          ./configure
+
+      - name: Build Documentation
+        working-directory: opus
+        run: |
+          make -C doc
+          mkdir -p doc/txt doc/md
+          for f in doc/man/man3/*.3; do
+            filename=$(basename "$f" .3)
+            pandoc -f man -t plain "$f" -o "doc/txt/${filename}.txt"
+            pandoc -f man -t markdown "$f" -o "doc/md/${filename}.md"
+          done
+
+      - name: Upload Documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: opus-docs
+          path: |
+            opus/doc/html/
+            opus/doc/txt/
+            opus/doc/md/
+
+  build-opus-tools:
+    name: Build Opus Tools
+    needs: [build-flac-deps, build-opus-deps, check-upstream]
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        config: [static, dynamic]
+        include:
+          - config: static
+            configure_args: --enable-static --disable-shared
+            ldflags: -static -static-libgcc -static-libstdc++
+            cflags: -O2 -DFLAC__NO_DLL
+            pkg_config_cmd: pkg-config --static
+          - config: dynamic
+            configure_args: --enable-shared --disable-static
+            ldflags: ""
+            cflags: -O2
+            pkg_config_cmd: pkg-config
+    env:
+      PREFIX: ${{ github.workspace }}/install/${{ matrix.config }}
+      PKG_CONFIG_PATH: ${{ github.workspace }}/install/${{ matrix.config }}/lib/pkgconfig
+      PKG_CONFIG_LIBDIR: ${{ github.workspace }}/install/${{ matrix.config }}/lib/pkgconfig
+      PKG_CONFIG_CMD: ${{ matrix.pkg_config_cmd }}
+
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            autotools
+            git
+            mingw-w64-x86_64-toolchain
+            mingw-w64-x86_64-pkg-config
+            gettext
+
+      - name: Fetch opus-tools source
+        shell: msys2 {0}
+        run: |
+          git clone https://gitlab.xiph.org/xiph/opus-tools.git
+          git -C opus-tools checkout ${{ needs.check-upstream.outputs.opus_tools_hash }}
+
+      - name: Download flac deps
+        uses: actions/download-artifact@v4
+        with:
+          name: flac-deps-${{ matrix.config }}
+          path: ${{ env.PREFIX }}
+
+      - name: Download opus deps
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-deps-${{ matrix.config }}
+          path: ${{ env.PREFIX }}
+
+      - name: Build opus-tools
+        shell: msys2 {0}
+        run: |
+          cd opus-tools
+          ./autogen.sh
+          mkdir -p build-${{ matrix.config }}
+          cd build-${{ matrix.config }}
+          export PKG_CONFIG="${{ matrix.pkg_config_cmd }}"
+          export CFLAGS="${{ matrix.cflags }}"
+          export LDFLAGS="${{ matrix.ldflags }}"
+          export PKG_CONFIG_PATH="$PKG_CONFIG_PATH"
+          export PKG_CONFIG_LIBDIR="$PKG_CONFIG_LIBDIR"
+          ../configure \
+            --prefix="$PREFIX" \
+            --with-flac \
+            ${{ matrix.configure_args }}
+          make -j$(nproc)
+          make install
+
+      - name: Copy DLLs (Dynamic only)
+        if: matrix.config == 'dynamic'
+        shell: msys2 {0}
+        run: |
+          cd "${PREFIX}/bin"
+          for exe in *.exe; do
+            ldd "$exe" | grep '/mingw64/bin' | awk '{print $3}' | xargs -I {} cp -u {} . || true
+          done
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: opus-tools-windows-${{ matrix.config }}
+          path: ${{ env.PREFIX }}
+
+  release:
+    needs: [check-upstream, build-opus-tools, build-opus-docs]
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Download version file
+        uses: actions/download-artifact@v4
+        with:
+          name: upstream-version
+          path: .github
+
+      - name: Download opus-tools static artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-tools-windows-static
+          path: release_staging/opus-tools-static
+
+      - name: Download opus-tools dynamic artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-tools-windows-dynamic
+          path: release_staging/opus-tools-dynamic
+
+      - name: Download opus-docs artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-docs
+          path: release_staging/opus-docs
+
+      - name: Generate Release Info
+        id: info
+        run: python .github/scripts/generate_release_info.py
+
+      - name: Create Zip
+        run: |
+          cd release_staging
+          # Zip static
+          zip -r "../${{ steps.info.outputs.zip_name }}" opus-tools-static opus-tools-dynamic opus-docs
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ steps.info.outputs.tag_name }}" \
+            "${{ steps.info.outputs.zip_name }}" \
+            --title "${{ steps.info.outputs.tag_name }}" \
+            --notes-file release_notes.md
+
+  update-json:
+    needs: [check-upstream, release]
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download version file
+        uses: actions/download-artifact@v4
+        with:
+          name: upstream-version
+          path: .github
+          
+      - name: Commit and Push
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add .github/upstream-version.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update upstream versions"
+            git push
+          fi
