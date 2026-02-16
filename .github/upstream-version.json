@@ -3,7 +3,7 @@
     "name": "ogg",
     "url": "https://gitlab.xiph.org/xiph/ogg.git",
     "commit_hash": "0288fadac3ac62d453409dfc83e9c4ab617d2472",
-    "commit_url": "https://gitlab.xiph.org/xiph/o/-/commit/0288fadac3ac62d453409dfc83e9c4ab617d2472",
+    "commit_url": "https://gitlab.xiph.org/xiph/ogg/-/commit/0288fadac3ac62d453409dfc83e9c4ab617d2472",
     "commit_time": "2025-07-07 10:00:27 -0400"
   },
   "flac": {
