@@ -226,6 +226,46 @@ jobs:
           name: opus-deps
           path: ${{ env.PREFIX }}
 
+  build-opus-docs:
+    name: Build Opus Docs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: xiph/opus
+          path: opus
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y doxygen graphviz pandoc groff
+
+      - name: Configure
+        working-directory: opus
+        run: |
+          ./autogen.sh
+          ./configure
+
+      - name: Build Documentation
+        working-directory: opus
+        run: |
+          make -C doc
+          mkdir -p doc/txt doc/md
+          for f in doc/man/man3/*.3; do
+            filename=$(basename "$f" .3)
+            pandoc -f man -t plain "$f" -o "doc/txt/${filename}.txt"
+            pandoc -f man -t markdown "$f" -o "doc/md/${filename}.md"
+          done
+
+      - name: Upload Documentation
+        uses: actions/upload-artifact@v4
+        with:
+          name: opus-docs
+          path: |
+            opus/doc/html/
+            opus/doc/txt/
+            opus/doc/md/
+
   build-opus-tools:
     name: Build Opus Tools
     needs: [build-flac-deps, build-opus-deps]
