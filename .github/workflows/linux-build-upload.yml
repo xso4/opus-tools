@@ -337,8 +337,8 @@ jobs:
             filename=$(basename "$file" .1)
             echo "Processing $filename..."
             groff -t -man -Thtml "$file" > "output/html/$filename.html"
-            pandoc -f man -t gfm "$file" -o "output/md/$filename.md"
-            groff -t -man -Tutf8 "$file" | col -b > "output/txt/$filename.txt"
+            pandoc -f man -t markdown "$file" -o "output/md/$filename.md"
+            pandoc -f man -t plain "$file" -o "output/txt/$filename.txt"
           done
 
       - name: Upload Artifacts
