@@ -309,6 +309,44 @@ jobs:
             opus/doc/txt/
             opus/doc/md/
 
+  build-opus-tools-docs:
+    name: Build Opus Tools Docs
+    needs: check-upstream
+    if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y groff pandoc git
+
+      - name: Clone upstream opus-tools
+        run: |
+          git clone https://gitlab.xiph.org/xiph/opus-tools.git upstream-opus-tools
+          git -C upstream-opus-tools checkout ${{ needs.check-upstream.outputs.opus_tools_hash }}
+
+      - name: Create output directories
+        run: |
+          mkdir -p output/html output/md output/txt
+
+      - name: Convert Man Pages
+        run: |
+          for file in upstream-opus-tools/man/*.1; do
+            filename=$(basename "$file" .1)
+            echo "Processing $filename..."
+            groff -t -man -Thtml "$file" > "output/html/$filename.html"
+            pandoc -f man -t gfm "$file" -o "output/md/$filename.md"
+            groff -t -man -Tutf8 "$file" | col -b > "output/txt/$filename.txt"
+          done
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: opus-tools-docs
+          path: output/
+
   build-opus-tools:
     name: Build Opus Tools
     needs: [build-flac-deps, build-opus-deps, check-upstream]
@@ -385,7 +423,7 @@ jobs:
           path: ${{ env.PREFIX }}
 
   release:
-    needs: [check-upstream, build-opus-tools, build-opus-docs]
+    needs: [check-upstream, build-opus-tools, build-opus-docs, build-opus-tools-docs]
     if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     permissions:
@@ -415,6 +453,12 @@ jobs:
         with:
           name: opus-docs
           path: release_staging/opus-docs
+
+      - name: Download opus-tools-docs artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: opus-tools-docs
+          path: release_staging/opus-tools-docs
 
       - name: Generate Release Info
         id: info
