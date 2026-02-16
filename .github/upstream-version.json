@@ -1,0 +1,44 @@
+{
+  "ogg": {
+    "name": "ogg",
+    "url": "https://gitlab.xiph.org/xiph/ogg.git",
+    "commit_hash": "0288fadac3ac62d453409dfc83e9c4ab617d2472",
+    "commit_url": "https://gitlab.xiph.org/xiph/o/-/commit/0288fadac3ac62d453409dfc83e9c4ab617d2472",
+    "commit_time": "2025-07-07 10:00:27 -0400"
+  },
+  "flac": {
+    "name": "flac",
+    "url": "https://gitlab.xiph.org/xiph/flac.git",
+    "commit_hash": "1507800de4b70e21be71f38caa0d9079d0bc6e45",
+    "commit_url": "https://gitlab.xiph.org/xiph/flac/-/commit/1507800de4b70e21be71f38caa0d9079d0bc6e45",
+    "commit_time": "2025-02-11 13:46:28 +0100"
+  },
+  "opus": {
+    "name": "opus",
+    "url": "https://gitlab.xiph.org/xiph/opus.git",
+    "commit_hash": "2d862ea14b233e5a3f3afaf74d96050691af3cd5",
+    "commit_url": "https://gitlab.xiph.org/xiph/opus/-/commit/2d862ea14b233e5a3f3afaf74d96050691af3cd5",
+    "commit_time": "2026-02-04 22:48:16 -0800"
+  },
+  "libopusenc": {
+    "name": "libopusenc",
+    "url": "https://gitlab.xiph.org/xiph/libopusenc.git",
+    "commit_hash": "bd9d0743ce18d7b6343011c83e4f8ebcda6813d0",
+    "commit_url": "https://gitlab.xiph.org/xiph/libopusenc/-/commit/bd9d0743ce18d7b6343011c83e4f8ebcda6813d0",
+    "commit_time": "2026-02-04 09:56:51 -0800"
+  },
+  "opusfile": {
+    "name": "opusfile",
+    "url": "https://gitlab.xiph.org/xiph/opusfile.git",
+    "commit_hash": "cc04a82f7964067da6e3f5dddc7634b833c9402c",
+    "commit_url": "https://gitlab.xiph.org/xiph/opusfile/-/commit/cc04a82f7964067da6e3f5dddc7634b833c9402c",
+    "commit_time": "2025-12-16 03:01:43 -0800"
+  },
+  "opus-tools": {
+    "name": "opus-tools",
+    "url": "https://gitlab.xiph.org/xiph/opus-tools.git",
+    "commit_hash": "828e11ea5d479542577b047b352c9dc793a82e32",
+    "commit_url": "https://gitlab.xiph.org/xiph/opus-tools/-/commit/828e11ea5d479542577b047b352c9dc793a82e32",
+    "commit_time": "2026-02-04 09:01:03 -0800"
+  }
+}
