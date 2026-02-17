@@ -293,11 +293,23 @@ jobs:
         working-directory: opus
         run: |
           make -C doc
-          mkdir -p doc/txt doc/md
+          # Create directories for different sources
+          mkdir -p doc/man_txt doc/man_md doc/html_txt doc/html_md
+
+          # 1. Generate from Man pages (High Quality)
+          echo "Generating docs from Man pages..."
           for f in doc/man/man3/*.3; do
             filename=$(basename "$f" .3)
-            pandoc -f man -t plain "$f" -o "doc/txt/${filename}.txt"
-            pandoc -f man -t markdown "$f" -o "doc/md/${filename}.md"
+            pandoc -f man -t plain "$f" -o "doc/man_txt/${filename}.txt"
+            pandoc -f man -t markdown "$f" -o "doc/man_md/${filename}.md"
+          done
+
+          # 2. Generate from HTML (Complete Coverage)
+          echo "Generating docs from HTML..."
+          for f in doc/html/*.html; do
+            filename=$(basename "$f" .html)
+            pandoc -f html -t plain "$f" -o "doc/html_txt/${filename}.txt"
+            pandoc -f html -t markdown "$f" -o "doc/html_md/${filename}.md"
           done
 
       - name: Upload Documentation
@@ -306,8 +318,10 @@ jobs:
           name: opus-docs
           path: |
             opus/doc/html/
-            opus/doc/txt/
-            opus/doc/md/
+            opus/doc/man_txt/
+            opus/doc/man_md/
+            opus/doc/html_txt/
+            opus/doc/html_md/
 
   build-opus-tools-docs:
     name: Build Opus Tools Docs
