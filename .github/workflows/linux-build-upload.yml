@@ -17,10 +17,10 @@ jobs:
       opusfile_hash: ${{ steps.check.outputs.opusfile_hash }}
       opus_tools_hash: ${{ steps.check.outputs.opus_tools_hash }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
           
@@ -29,7 +29,7 @@ jobs:
         run: python .github/scripts/upstream_manager.py
         
       - name: Upload version file
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: upstream-version
           path: .github/upstream-version.json
@@ -116,7 +116,7 @@ jobs:
           make install
 
       - name: Upload flac deps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: flac-deps
           path: ${{ env.PREFIX }}
@@ -261,7 +261,7 @@ jobs:
           make install
 
       - name: Upload opus deps
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: opus-deps
           path: ${{ env.PREFIX }}
@@ -272,7 +272,7 @@ jobs:
     if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           repository: xiph/opus
           path: opus
@@ -313,7 +313,7 @@ jobs:
           done
 
       - name: Upload Documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: opus-docs
           path: |
@@ -329,7 +329,7 @@ jobs:
     if: needs.check-upstream.outputs.upstream_updated == 'true' || github.event_name != 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Install dependencies
         run: |
@@ -356,7 +356,7 @@ jobs:
           done
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: opus-tools-docs
           path: output/
@@ -390,13 +390,13 @@ jobs:
           git -C opus-tools checkout ${{ needs.check-upstream.outputs.opus_tools_hash }}
 
       - name: Download flac deps
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: flac-deps
           path: ${{ env.PREFIX }}
 
       - name: Download opus deps
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: opus-deps
           path: ${{ env.PREFIX }}
@@ -431,7 +431,7 @@ jobs:
 
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ${{ env.ARTIFACT_NAME }}
           path: ${{ env.PREFIX }}
@@ -443,33 +443,33 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: '3.x'
 
       - name: Download version file
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: upstream-version
           path: .github
 
       - name: Download opus-tools artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: opus-tools-windows-mingw-static
           path: release_staging/opus-tools
 
       - name: Download opus-docs artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: opus-docs
           path: release_staging/opus-docs
 
       - name: Download opus-tools-docs artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: opus-tools-docs
           path: release_staging/opus-tools-docs
@@ -499,10 +499,10 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       
       - name: Download version file
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: upstream-version
           path: .github
