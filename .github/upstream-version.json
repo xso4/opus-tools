@@ -16,29 +16,29 @@
   "opus": {
     "name": "opus",
     "url": "https://gitlab.xiph.org/xiph/opus.git",
-    "commit_hash": "2d862ea14b233e5a3f3afaf74d96050691af3cd5",
-    "commit_url": "https://gitlab.xiph.org/xiph/opus/-/commit/2d862ea14b233e5a3f3afaf74d96050691af3cd5",
-    "commit_time": "2026-02-04 22:48:16 -0800"
+    "commit_hash": "788cc89ce4f2c42025d8c70ec1b4457dc89cd50f",
+    "commit_url": "https://gitlab.xiph.org/xiph/opus/-/commit/788cc89ce4f2c42025d8c70ec1b4457dc89cd50f",
+    "commit_time": "2026-03-21 11:16:20 -0400"
   },
   "libopusenc": {
     "name": "libopusenc",
     "url": "https://gitlab.xiph.org/xiph/libopusenc.git",
-    "commit_hash": "440e35fbf8b849d98c34de230e42a7431a673932",
-    "commit_url": "https://gitlab.xiph.org/xiph/libopusenc/-/commit/440e35fbf8b849d98c34de230e42a7431a673932",
-    "commit_time": "2026-02-25 23:28:47 -0800"
+    "commit_hash": "3f957ca3d7305ce3d0a8cea00dd7bc59619f6940",
+    "commit_url": "https://gitlab.xiph.org/xiph/libopusenc/-/commit/3f957ca3d7305ce3d0a8cea00dd7bc59619f6940",
+    "commit_time": "2026-02-28 14:50:18 -0800"
   },
   "opusfile": {
     "name": "opusfile",
     "url": "https://gitlab.xiph.org/xiph/opusfile.git",
-    "commit_hash": "cc04a82f7964067da6e3f5dddc7634b833c9402c",
-    "commit_url": "https://gitlab.xiph.org/xiph/opusfile/-/commit/cc04a82f7964067da6e3f5dddc7634b833c9402c",
-    "commit_time": "2025-12-16 03:01:43 -0800"
+    "commit_hash": "6dfd29e7adb87f2e193575fc3fa88cbf1a0b27df",
+    "commit_url": "https://gitlab.xiph.org/xiph/opusfile/-/commit/6dfd29e7adb87f2e193575fc3fa88cbf1a0b27df",
+    "commit_time": "2026-03-28 14:59:03 -0700"
   },
   "opus-tools": {
     "name": "opus-tools",
     "url": "https://gitlab.xiph.org/xiph/opus-tools.git",
-    "commit_hash": "4b9671781d35210f68d64cd9134fa3e4eb6b0f11",
-    "commit_url": "https://gitlab.xiph.org/xiph/opus-tools/-/commit/4b9671781d35210f68d64cd9134fa3e4eb6b0f11",
-    "commit_time": "2026-03-05 01:07:16 -0800"
+    "commit_hash": "5f894e95a50b2004d8c8171082a5fd7327f93653",
+    "commit_url": "https://gitlab.xiph.org/xiph/opus-tools/-/commit/5f894e95a50b2004d8c8171082a5fd7327f93653",
+    "commit_time": "2026-03-24 21:51:04 -0700"
   }
 }
